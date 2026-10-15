@@ -1,0 +1,137 @@
+version: 2
+
+models:
+  - name: base_customer
+    description: One row per TPC-H customer.
+    columns:
+      - name: customer_key
+        data_tests: [unique, not_null]
+      - name: nation_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('base_nation')
+                field: nation_key
+
+  - name: base_orders
+    description: One row per TPC-H order.
+    columns:
+      - name: order_key
+        data_tests: [unique, not_null]
+      - name: customer_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('base_customer')
+                field: customer_key
+      - name: order_date
+        data_tests: [not_null]
+
+  - name: base_lineitem
+    description: One row per order line, identified by order_key and line_number.
+    columns:
+      - name: order_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('base_orders')
+                field: order_key
+      - name: line_number
+        data_tests: [not_null]
+      - name: extended_price
+        data_tests: [not_null]
+      - name: discount
+        data_tests: [not_null]
+
+  - name: base_nation
+    description: One row per nation.
+    columns:
+      - name: nation_key
+        data_tests: [unique, not_null]
+      - name: region_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('base_region')
+                field: region_key
+
+  - name: base_region
+    description: One row per region.
+    columns:
+      - name: region_key
+        data_tests: [unique, not_null]
+
+  - name: int_customer_geography
+    description: Customers enriched with their nation and region.
+    columns:
+      - name: customer_key
+        data_tests: [unique, not_null]
+      - name: nation_name
+        data_tests: [not_null]
+      - name: region_name
+        data_tests: [not_null]
+
+  - name: int_order_revenue
+    description: One row per order with discounted lineitem revenue, excluding tax.
+    columns:
+      - name: order_key
+        data_tests: [unique, not_null]
+      - name: order_revenue
+        data_tests: [not_null]
+
+  - name: dim_customer
+    description: Customer dimension with nation and region attributes.
+    columns:
+      - name: customer_key
+        data_tests: [unique, not_null]
+      - name: nation_name
+        data_tests: [not_null]
+      - name: region_name
+        data_tests: [not_null]
+
+  - name: fct_daily_order_revenue
+    description: One row per order date with order count and discounted revenue, excluding tax.
+    columns:
+      - name: order_date
+        data_tests: [unique, not_null]
+      - name: order_count
+        data_tests: [not_null]
+      - name: order_revenue
+        data_tests: [not_null]
+
+unit_tests:
+  - name: order_revenue_applies_discounts_and_preserves_empty_orders
+    model: int_order_revenue
+    given:
+      - input: ref('base_orders')
+        rows:
+          - {order_key: 1, customer_key: 10, order_date: '2026-01-01'}
+          - {order_key: 2, customer_key: 20, order_date: '2026-01-01'}
+          - {order_key: 3, customer_key: 30, order_date: '2026-01-02'}
+      - input: ref('base_lineitem')
+        rows:
+          - {order_key: 1, extended_price: 100.00, discount: 0.10}
+          - {order_key: 1, extended_price: 50.00, discount: 0.00}
+          - {order_key: 2, extended_price: 200.00, discount: 0.05}
+    expect:
+      rows:
+        - {order_key: 1, customer_key: 10, order_date: '2026-01-01', order_revenue: 140.00}
+        - {order_key: 2, customer_key: 20, order_date: '2026-01-01', order_revenue: 190.00}
+        - {order_key: 3, customer_key: 30, order_date: '2026-01-02', order_revenue: 0.00}
+
+  - name: daily_revenue_counts_orders_and_groups_by_order_date
+    model: fct_daily_order_revenue
+    given:
+      - input: ref('int_order_revenue')
+        rows:
+          - {order_key: 1, order_date: '2026-01-01', order_revenue: 140.00}
+          - {order_key: 2, order_date: '2026-01-01', order_revenue: 190.00}
+          - {order_key: 3, order_date: '2026-01-02', order_revenue: 0.00}
+    expect:
+      rows:
+        - {order_date: '2026-01-01', order_count: 2, order_revenue: 330.00}
+        - {order_date: '2026-01-02', order_count: 1, order_revenue: 0.00}

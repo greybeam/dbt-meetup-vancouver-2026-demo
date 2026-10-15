@@ -1,0 +1,24 @@
+name: tpch_demo
+version: 1.0.0
+config-version: 2
+
+profile: tpch_demo
+
+model-paths: ["models"]
+clean-targets: ["target", "dbt_packages", "logs"]
+
+flags:
+  use_catalogs_v2: true
+
+query-comment:
+  comment: "{{ query_comment(node) }}"
+  append: true
+
+models:
+  tpch_demo:
+    base:
+      +materialized: table
+    intermediate:
+      +materialized: table
+    marts:
+      +materialized: table

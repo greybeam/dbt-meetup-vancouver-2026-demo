@@ -1,0 +1,33 @@
+tpch_demo:
+  target: snowflake
+
+  outputs:
+    snowflake: &snowflake_connection
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      private_key_path: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PATH') }}"
+      private_key_passphrase: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PASSPHRASE', '') }}"
+
+      role: "{{ env_var('SNOWFLAKE_ROLE') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
+      database: "{{ env_var('SNOWFLAKE_TARGET_DATABASE') }}"
+      schema: TPCH_DEMO
+
+      threads: 8
+
+    duckdb: &duckdb_connection
+      type: duckdb
+      path: ':memory:'
+      schema: TPCH_DEMO
+      secrets:
+        - type: iceberg
+          name: horizon_secret
+          client_id: "" # MUST be empty
+          client_secret: "{{ env_var('PAT_TOKEN_SECRET') }}"
+          oauth2_server_uri: "https://{{ env_var('SNOWFLAKE_ACCOUNT') }}.snowflakecomputing.com/polaris/api/catalog/v1/oauth/tokens"
+          oauth2_scope: "session:role:{{ env_var('SNOWFLAKE_ROLE') }}"
+
+    greybeam:
+      <<: *snowflake_connection
+      host: GOPGUKF-JO19546.demo.compute.greybeam.ai

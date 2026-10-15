@@ -1,0 +1,13 @@
+catalogs:
+  - name: horizon_catalog
+    type: horizon
+    table_format: iceberg
+    config:
+      snowflake:
+        external_volume: SNOWFLAKE_MANAGED # Otherwise define as your external volume name
+      duckdb:
+        warehouse: DEMO_DB  # Horizon REST "warehouse" = the Snowflake database name
+        endpoint: "https://{{ env_var('SNOWFLAKE_ACCOUNT') }}.snowflakecomputing.com/polaris/api/catalog"
+        secret: horizon_secret # references the profiles.yml secret above
+        default_schema: TPCH_DEMO
+        access_delegation_mode: VENDED_CREDENTIALS # Horizon vends temp S3 creds; no AWS keys needed
