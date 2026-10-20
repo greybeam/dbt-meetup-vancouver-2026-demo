@@ -1,6 +1,5 @@
 {{ config(
     materialized='table',
-    catalog_name='horizon_catalog',
     alias='BASE_NATION'
 ) }}
 

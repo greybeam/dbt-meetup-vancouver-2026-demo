@@ -18,6 +18,7 @@ models:
   tpch_demo:
     base:
       +materialized: table
+      +catalog_name: horizon_catalog
     intermediate:
       +materialized: table
     marts:

@@ -103,6 +103,21 @@ models:
       - name: order_revenue
         data_tests: [not_null]
 
+  - name: fct_daily_revenue_by_region
+    description: >
+      One row per order date and customer region with order count and discounted
+      revenue, excluding tax. Joins Snowflake-built order revenue to DuckDB-built
+      customer geography. Orders without matching geography retain a null region.
+    columns:
+      - name: order_date
+        data_tests: [not_null]
+      - name: region_name
+        description: Customer region, or null when geography is unavailable.
+      - name: order_count
+        data_tests: [not_null]
+      - name: order_revenue
+        data_tests: [not_null]
+
 unit_tests:
   - name: order_revenue_applies_discounts_and_preserves_empty_orders
     model: int_order_revenue
@@ -135,3 +150,42 @@ unit_tests:
       rows:
         - {order_date: '2026-01-01', order_count: 2, order_revenue: 330.00}
         - {order_date: '2026-01-02', order_count: 1, order_revenue: 0.00}
+
+  - name: regional_revenue_groups_orders_by_date_and_customer_region
+    model: fct_daily_revenue_by_region
+    given:
+      - input: ref('int_order_revenue')
+        rows:
+          - {order_key: 1, customer_key: 10, order_date: '2026-01-01', order_revenue: 140.1250}
+          - {order_key: 2, customer_key: 20, order_date: '2026-01-01', order_revenue: 190.2500}
+          - {order_key: 3, customer_key: 10, order_date: '2026-01-01', order_revenue: 5.1250}
+          - {order_key: 4, customer_key: 30, order_date: '2026-01-01', order_revenue: 50.00}
+          - {order_key: 5, customer_key: 10, order_date: '2026-01-02', order_revenue: 0.00}
+      - input: ref('int_customer_geography')
+        rows:
+          - {customer_key: 10, region_name: EUROPE}
+          - {customer_key: 20, region_name: EUROPE}
+          - {customer_key: 30, region_name: ASIA}
+          - {customer_key: 40, region_name: AFRICA}
+    expect:
+      rows:
+        - {order_date: '2026-01-01', region_name: EUROPE, order_count: 3, order_revenue: 335.5000}
+        - {order_date: '2026-01-01', region_name: ASIA, order_count: 1, order_revenue: 50.00}
+        - {order_date: '2026-01-02', region_name: EUROPE, order_count: 1, order_revenue: 0.00}
+
+  - name: regional_revenue_preserves_orders_without_geography
+    model: fct_daily_revenue_by_region
+    given:
+      - input: ref('int_order_revenue')
+        rows:
+          - {order_key: 1, customer_key: 10, order_date: '2026-01-01', order_revenue: 140.00}
+          - {order_key: 2, customer_key: 20, order_date: '2026-01-01', order_revenue: 25.50}
+          - {order_key: 3, customer_key: 30, order_date: '2026-01-01', order_revenue: 10.00}
+      - input: ref('int_customer_geography')
+        rows:
+          - {customer_key: 10, region_name: EUROPE}
+          - {customer_key: 30, region_name: null}
+    expect:
+      rows:
+        - {order_date: '2026-01-01', region_name: EUROPE, order_count: 1, order_revenue: 140.00}
+        - {order_date: '2026-01-01', region_name: null, order_count: 2, order_revenue: 35.50}
